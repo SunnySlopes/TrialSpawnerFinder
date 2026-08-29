@@ -66,9 +66,7 @@ public final class FinderSearch {
     public void run() throws IOException {
         Instant started = Instant.now();
         System.out.println("使用有界分片流水线扫描并预测试炼密室...");
-        System.out.println("JVM 可用逻辑处理器：%d；快速扫描线程：%d；精细生成线程：%d".formatted(
-                Runtime.getRuntime().availableProcessors(), config.scanThreads(),
-                fineThreadCount(Runtime.getRuntime().availableProcessors())));
+        System.out.println(ResultWriter.parameterLine(config));
         System.out.println("试炼密室自动分片：边长 %,d 方块；共 %,d 片。".formatted(
                 ShardedClusterScanner.processingShardSizeBlocks(config),
                 ShardedClusterScanner.processingShardCount(config)));
@@ -392,11 +390,12 @@ public final class FinderSearch {
 
     public synchronized void save() throws IOException {
         List<SearchResult> results = accumulatedResults.results();
+        List<String> parameterLines = ResultWriter.parameterLines(config, this.checkTop);
         if (this.checkTop > 0 && this.checkTopChecker != null) {
             List<ResultWriter.CheckResult> checks = this.checkTopChecker.apply(results);
-            ResultWriter.write(output, results, checks);
+            ResultWriter.write(output, results, checks, parameterLines);
         } else {
-            ResultWriter.write(output, results);
+            ResultWriter.write(output, results, null, parameterLines);
         }
     }
 

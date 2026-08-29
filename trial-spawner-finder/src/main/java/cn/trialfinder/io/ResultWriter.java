@@ -1,14 +1,17 @@
 package cn.trialfinder.io;
 
+import cn.minecraftfinder.core.AreaShape;
 import cn.minecraftfinder.core.BlockPoint;
 import cn.minecraftfinder.core.ResultFiles;
 import cn.minecraftfinder.core.ResultTableWriter;
+import cn.trialfinder.config.FinderConfig;
 import cn.trialfinder.model.SearchResult;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 public final class ResultWriter {
@@ -29,7 +32,7 @@ public final class ResultWriter {
     }
 
     public static void write(Path path, List<SearchResult> results) throws IOException {
-        write(path, results, null);
+        write(path, results, null, List.of());
     }
 
     /**
@@ -39,6 +42,18 @@ public final class ResultWriter {
      */
     public static void write(Path path, List<SearchResult> results,
                              List<CheckResult> checks) throws IOException {
+        write(path, results, checks, List.of());
+    }
+
+    /**
+     * 同 {@link #write(Path, List, List)}，但在 CSV 与对齐文本头部写入 {@code # } 参数注释行
+     * （结果文件自文档化，可用 {@code query --file} 直接回读坐标）。
+     *
+     * @param parameterLines 参数说明行；空时文件与旧版格式完全一致
+     */
+    public static void write(Path path, List<SearchResult> results,
+                             List<CheckResult> checks,
+                             List<String> parameterLines) throws IOException {
         boolean withCheck = checks != null && !checks.isEmpty();
         List<String> headers = withCheck
                 ? new ArrayList<>(HEADERS) { {
@@ -73,7 +88,47 @@ public final class ResultWriter {
             csvRows.add(rowFixed);
             textRows.add(rowWithTextSeparator(rowFixed, result));
         }
-        ResultTableWriter.write(path, headers, csvRows, textRows);
+        ResultTableWriter.write(path, headers, csvRows, textRows, parameterLines);
+    }
+
+    // ------------------------------------------------------------ 参数说明
+
+    /** 控制台单行参数摘要（搜索开始时打印）。 */
+    public static String parameterLine(FinderConfig config) {
+        return "参数：seed=%d；搜索范围=%s；统计=半径%d方块、形状%s；达标=密室≥%d、刷怪笼≥%d；快速扫描线程=%d"
+                .formatted(
+                        config.seed(), searchAreaText(config),
+                        config.clusterRadiusBlocks(), shapeName(config.areaShape()),
+                        config.minStructures(), config.minSpawners(),
+                        config.scanThreads());
+    }
+
+    /** 结果文件头部的 {@code # } 参数注释行。 */
+    public static List<String> parameterLines(FinderConfig config, int checkTop) {
+        List<String> lines = new ArrayList<>();
+        lines.add("TrialSpawnerFinder 搜索结果");
+        lines.add("seed=" + config.seed());
+        lines.add("搜索范围=" + searchAreaText(config));
+        lines.add("统计范围=半径" + config.clusterRadiusBlocks() + "方块、形状"
+                + shapeName(config.areaShape()));
+        lines.add("达标条件=密室≥" + config.minStructures() + "、刷怪笼≥" + config.minSpawners());
+        lines.add("快速扫描线程=" + config.scanThreads());
+        if (checkTop > 0) {
+            lines.add("check-top=" + checkTop);
+        }
+        return List.copyOf(lines);
+    }
+
+    private static String searchAreaText(FinderConfig config) {
+        return config.fullWorld()
+                ? "全图"
+                : "中心(%d,%d)、半径%,d、形状%s".formatted(
+                        config.searchCenterX(), config.searchCenterZ(),
+                        config.searchRadiusBlocks(), shapeName(config.searchAreaShape()));
+    }
+
+    private static String shapeName(AreaShape shape) {
+        return shape.name().toLowerCase(Locale.ROOT);
     }
 
     /** 对齐文本版：密室位置用 " | " 分隔（阅读友好），其余列与 CSV 一致。 */

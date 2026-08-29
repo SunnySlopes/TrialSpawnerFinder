@@ -59,4 +59,21 @@ class ResultWriterTest {
         assertTrue(lines.get(3).startsWith("3;104;1;1;104;"));
         assertTrue(lines.get(300).startsWith("300;5;1;1;5;"));
     }
+
+    @Test
+    void writesParameterHeaderBeforeTable() throws IOException {
+        List<SearchResult> results = List.of(
+                new SearchResult(0, -104, 2, 104, List.of(new BlockPoint(0, -104))));
+        Path output = directory.resolve("params.csv");
+        List<String> params = List.of("seed=0", "搜索范围=中心(0,0)、半径1,000、形状circle");
+
+        ResultWriter.write(output, results, null, params);
+
+        List<String> lines = Files.readAllLines(output);
+        assertEquals(4, lines.size());
+        assertEquals("﻿# seed=0", lines.get(0));
+        assertEquals("# 搜索范围=中心(0,0)、半径1,000、形状circle", lines.get(1));
+        assertEquals("排名;中心X;中心Z;密室数量;试炼刷怪笼数量;密室位置", lines.get(2));
+        assertEquals("1;0;-104;2;104;0,-104", lines.get(3));
+    }
 }

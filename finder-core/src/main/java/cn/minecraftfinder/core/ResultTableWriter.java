@@ -13,7 +13,7 @@ public final class ResultTableWriter {
     }
 
     public static void write(Path csvPath, List<String> headers, List<List<String>> rows) throws IOException {
-        write(csvPath, headers, rows, rows);
+        write(csvPath, headers, rows, rows, List.of());
     }
 
     public static void write(
@@ -21,13 +21,25 @@ public final class ResultTableWriter {
             List<String> headers,
             List<List<String>> csvRows,
             List<List<String>> textRows) throws IOException {
+        write(csvPath, headers, csvRows, textRows, List.of());
+    }
+
+    /** 同上，但在 CSV 与对齐文本前写入 {@code # } 前缀的参数注释行（结果文件自文档化）。 */
+    public static void write(
+            Path csvPath,
+            List<String> headers,
+            List<List<String>> csvRows,
+            List<List<String>> textRows,
+            List<String> commentLines) throws IOException {
         if (csvRows.size() != textRows.size()) {
             throw new IllegalArgumentException("CSV 与对齐文本的结果行数不一致");
         }
+        List<String> comments = commentLines == null ? List.of() : List.copyOf(commentLines);
         List<List<String>> checkedCsvRows = validateRows(headers, csvRows);
         List<List<String>> checkedTextRows = validateRows(headers, textRows);
         try (BufferedWriter writer = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8)) {
             writer.write('\uFEFF');
+            writeComments(writer, comments);
             writer.write(String.join(";", headers));
             writer.newLine();
             for (List<String> row : checkedCsvRows) {
@@ -35,7 +47,15 @@ public final class ResultTableWriter {
                 writer.newLine();
             }
         }
-        writeAligned(ResultFiles.textPath(csvPath), headers, checkedTextRows);
+        writeAligned(ResultFiles.textPath(csvPath), headers, checkedTextRows, comments);
+    }
+
+    private static void writeComments(BufferedWriter writer, List<String> comments) throws IOException {
+        for (String comment : comments) {
+            writer.write("# ");
+            writer.write(comment);
+            writer.newLine();
+        }
     }
 
     private static List<List<String>> validateRows(
@@ -52,7 +72,9 @@ public final class ResultTableWriter {
     }
 
     private static void writeAligned(
-            Path path, List<String> headers, List<List<String>> rows) throws IOException {
+            Path path, List<String> headers, List<List<String>> rows,
+            List<String> commentLines) throws IOException {
+        List<String> comments = commentLines == null ? List.of() : List.copyOf(commentLines);
         int[] widths = headers.stream().mapToInt(ResultTableWriter::displayWidth).toArray();
         for (List<String> row : rows) {
             for (int column = 0; column < row.size(); column++) {
@@ -62,6 +84,7 @@ public final class ResultTableWriter {
 
         try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
             writer.write('\uFEFF');
+            writeComments(writer, comments);
             writeRow(writer, headers, widths, false);
             for (List<String> row : rows) {
                 writeRow(writer, row, widths, true);

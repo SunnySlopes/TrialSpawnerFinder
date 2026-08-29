@@ -3,6 +3,13 @@ package cn.minecraftfinder.runtime;
 import cn.minecraftfinder.core.AreaShape;
 import cn.trialfinder.config.FinderConfig;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -10,6 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MainOverrideTest {
+
+    @TempDir
+    Path directory;
 
     private static FinderConfig base() {
         return new FinderConfig(
@@ -89,6 +99,24 @@ class MainOverrideTest {
                 new String[]{"--no-progress", "query", "--coords", "1,2"}, "--no-progress");
         assertEquals(3, clean.length);
         assertEquals("query", clean[0]);
+    }
+
+    @Test
+    void parseQueryFileSkipsParameterHeader() throws Exception {
+        Path file = directory.resolve("results.csv");
+        Files.writeString(file,
+                "﻿# seed=0\n# 搜索范围=中心(0,0)、半径1,000、形状circle\n"
+                        + "排名;中心X;中心Z;密室数量;试炼刷怪笼数量;密室位置\n"
+                        + "1;0;0;2;45;10,10|20,20\n"
+                        + "2;100;-100;3;60;30,30\n",
+                StandardCharsets.UTF_8);
+        List<int[]> points = new ArrayList<>();
+        Main.parseQueryFile(file, points);
+        assertEquals(2, points.size());
+        assertEquals(0, points.get(0)[0]);
+        assertEquals(0, points.get(0)[1]);
+        assertEquals(100, points.get(1)[0]);
+        assertEquals(-100, points.get(1)[1]);
     }
 
     @Test

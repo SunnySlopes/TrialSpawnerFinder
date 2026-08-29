@@ -378,7 +378,23 @@ public final class Main {
         if (lines.isEmpty()) {
             return;
         }
-        String header = lines.get(0);
+        // 结果文件现在带 # 参数头：跳过注释行与空行，并去掉首行 BOM。
+        List<String> dataLines = new ArrayList<>();
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (i == 0 && line.startsWith("﻿")) {
+                line = line.substring(1);
+            }
+            line = line.trim();
+            if (line.isEmpty() || line.startsWith("#")) {
+                continue;
+            }
+            dataLines.add(line);
+        }
+        if (dataLines.isEmpty()) {
+            return;
+        }
+        String header = dataLines.get(0);
         if (header.contains("中心X") || header.contains("CenterX")) {
             String[] columns = header.split(";|,|\\s+");
             int idxX = -1;
@@ -392,11 +408,8 @@ public final class Main {
                     idxZ = i;
                 }
             }
-            for (int i = 1; i < lines.size(); i++) {
-                String line = lines.get(i).trim();
-                if (line.isEmpty()) {
-                    continue;
-                }
+            for (int i = 1; i < dataLines.size(); i++) {
+                String line = dataLines.get(i);
                 String[] values = line.split(";|,|\\s+");
                 if (idxX >= 0 && idxZ >= 0 && values.length > Math.max(idxX, idxZ)) {
                     points.add(new int[]{Integer.parseInt(values[idxX].trim()),
@@ -404,11 +417,7 @@ public final class Main {
                 }
             }
         } else {
-            for (String line : lines) {
-                line = line.trim();
-                if (line.isEmpty() || line.startsWith("#")) {
-                    continue;
-                }
+            for (String line : dataLines) {
                 String[] parts = line.split("[,\\s]+");
                 if (parts.length >= 2) {
                     points.add(new int[]{Integer.parseInt(parts[0].trim()),

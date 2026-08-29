@@ -49,7 +49,8 @@ import java.util.concurrent.ConcurrentMap;
  * 与官方实现共享同一套 Jigsaw 拼接算法，因此刷怪笼坐标逐位一致。
  *
  * <p>与 {@code HandTrialChamberPredictor} 的区别：所有 Minecraft 类型换成自有的纯 Java 类型，
- * 构造函数不再需要 {@code ServerLevel}；生物群系判定（Phase 1）省略。
+ * 构造函数不再需要 {@code ServerLevel}；生物群系判定改用 {@code OverworldSampler} 完成
+ * （公共构造器默认启用，测试构造器可显式关闭）。
  */
 public final class TrialChamberPredictor {
     private static final Rotation[] ROTATIONS = Rotation.values();

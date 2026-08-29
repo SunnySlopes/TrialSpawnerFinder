@@ -2,7 +2,7 @@
 
 用于在 Minecraft 26.2 世界种子中查找试炼密室密集区域，并统计指定范围内实际生成的试炼刷怪笼。
 
-当前版本：**v1.5.0**（对应 Minecraft 26.2）。可从 [Releases](https://github.com/ZCXEDTA/TrialSpawnerFinder/releases) 下载现成的 `dist.zip` 免安装包，或用 `make-dist.bat` 自行构建。
+当前版本：**v2.0.0**（对应 Minecraft 26.2）。可从 [Releases](https://github.com/ZCXEDTA/TrialSpawnerFinder/releases) 下载现成的 `dist.zip` 免安装包，或用 `make-dist.bat` 自行构建。
 
 ## 使用方法
 
@@ -22,7 +22,7 @@
 
 ```
 dist\
-├── trial-spawner-finder-1.5.0.jar   # 主程序（零第三方依赖）
+├── trial-spawner-finder-2.0.0.jar   # 主程序（零第三方依赖）
 ├── trial.bat                        # 启动器（优先用捆绑 runtime）
 ├── finder.properties                # 配置
 ├── runtime\                         # jlink 精简 JRE（约 30 MB）
@@ -60,7 +60,7 @@ trial.bat query --coords 3145,7232 --radius 2000
 也可以绕过脚本直接用 `java -jar`（需已构建，JDK 25）：
 
 ```
-java -jar minecraft-26.2-runtime\build\libs\trial-spawner-finder-1.5.0.jar --seed 123
+java -jar minecraft-26.2-runtime\build\libs\trial-spawner-finder-2.0.0.jar --seed 123
 ```
 
 ## 命令行参数
@@ -104,7 +104,7 @@ trial.bat query --seed 0 --coords 3145,7232 --radius 2000
 - 运行时不需要 Minecraft 服务端或存档，直接复刻官方 Jigsaw 拼接生成试炼刷怪笼坐标。
 - 试炼密室 datapack 数据（结构 NBT、模板池 JSON、结构配置）已提取进 `minecraft-26.2-runtime\src\main\resources\data\minecraft` 并随 jar 打包。
 - 运行时零 `net/minecraft` 类、零第三方库，构建只需 JDK 25 + Gradle，无需联网拉取插件/依赖（JSON 解析用自研 `cn.trialfinder.sim.json.Json`）。
-- 产物是 `minecraft-26.2-runtime\build\libs\trial-spawner-finder-1.5.0.jar`，直接 `java -jar` 即可运行。
+- 产物是 `minecraft-26.2-runtime\build\libs\trial-spawner-finder-2.0.0.jar`，直接 `java -jar` 即可运行。
 
 `setup.ps1` 执行 `gradlew clean jar`（只编译主代码并打 fat jar，不跑测试），首次构建只下载一次 Gradle 发行版。如需重新提取 26.2 数据（例如升级版本），运行 `gradlew :minecraft-26.2-runtime:extractTrialChambersData`（需联网拉取 Minecraft 26.2 jar，或用 `-PminecraftJar=<jar路径>` 指定 jar）。
 
@@ -123,6 +123,16 @@ Minecraft 26.2 开发构建需要 JDK 25。`setup.ps1` 会从项目内 `java`、
 - `minecraft-26.2-runtime`（`cn.trialfinder.sim.*`）：**纯 Java 生成模拟层**——随机源（LCG/Xoroshiro/WorldgenRandom）、NBT/JSON 解析、结构模板、模板池、Jigsaw 拼接、试炼密室布局计算器（`TrialChamberPredictor`），由官方 `HandTrialChamberPredictor` 剥离改造而来，与官方 26.2 生成逻辑逐位一致（已用同一 seed/半径对照官方结果验证）。运行时零 Minecraft 依赖，独立 fat jar 可直接 `java -jar` 运行。
 
 ## 版本记录
+
+### v2.0.0（2026-08-29 · Minecraft 26.2）
+
+B 流核心 C++ 移植（JNI 混合架构）与输出自文档化。
+
+- **C++ 逻辑核心**：Jigsaw 拼接 / 试炼密室预测器整体移植到 `src/main/cpp`（`JigsawPlacement`、`HandTrialChamberPredictor`、`StructureTemplateManager`、NBT 解析、WorldgenRandom），与 Java oracle 逐位一致（37/37 GoogleTest；16 组合 count/exists、4 组完整刷怪笼列表对拍）。性能基准与一致性说明见 `src/main/cpp/reports/`。
+- **JNI 桥接**：`BFlowNative` ↔ `jni_bridge.cpp`，Java 保留资源加载与并发调度，C++ 执行 B 流拼接；运行时分发仍为纯 Java（JNI 接口尚未接入运行时调度）。
+- **生物群系筛选**：新增气候/噪声模拟（`OverworldSampler`），公共构造器默认启用，过滤唯一排除 `deep_dark`。
+- **输出自文档化**：结果 CSV/TXT 头部写入本次运行的全部参数（`#` 注释），`query --file` 可直接回读；启动时控制台回显生效参数。
+- **搜索模式合并**：AUTO/EXACT 合并为单一精确模式，移除搜索期冗余复核。
 
 ### v1.5.0（2026-08-20 · Minecraft 26.2）
 
