@@ -3,6 +3,8 @@ plugins {
     id 'application'
 }
 
+version = '1.0.0'
+
 base {
     archivesName = 'trial-spawner-finder-gui'
 }
@@ -24,9 +26,12 @@ application {
     mainClass = 'cn.trialfinder.gui.TrialSpawnerFinderFrame'
 }
 
-// 根目录 icon.png 打进 classpath，供窗口/任务栏图标使用。
+// 根目录 icon.png / font.ttf 打进 classpath。
 processResources {
     from(rootProject.file('icon.png')) {
+        into '.'
+    }
+    from(rootProject.file('font.ttf')) {
         into '.'
     }
 }
@@ -46,6 +51,6 @@ jar {
     manifest {
         attributes 'Main-Class': 'cn.trialfinder.gui.TrialSpawnerFinderFrame',
                    'Implementation-Title': 'TrialSpawnerFinderGUI',
-                   'Implementation-Version': rootProject.mod_version
+                   'Implementation-Version': project.version
     }
 }

@@ -27,9 +27,13 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.filechooser.FileNameExtensionFilter;
+import javax.swing.plaf.FontUIResource;
 import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Container;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GraphicsEnvironment;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
@@ -38,11 +42,13 @@ import java.awt.Taskbar;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,6 +57,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * TrialSpawnerFinder Swing 主界面。
  */
 public final class TrialSpawnerFinderFrame extends JFrame {
+    private static final float UI_FONT_SIZE = 13f;
+    private static final float RESULT_FONT_SIZE = 12f;
+    private static Font appFont;
+
     private static final int DEFAULT_MIN = -65536;
     private static final int DEFAULT_MAX = 65535;
     private static final int DEFAULT_SIDE = 131072;
@@ -146,6 +156,7 @@ public final class TrialSpawnerFinderFrame extends JFrame {
         tabs.addTab("单种子搜索", createSingleSeedPanel());
         tabs.addTab("从种子列表搜索", createListSearchPanel());
         setContentPane(tabs);
+        applyAppFont(this);
         applyBoundFieldEnableState(true);
         applyListBoundFieldEnableState(true);
     }
@@ -190,18 +201,92 @@ public final class TrialSpawnerFinderFrame extends JFrame {
         return null;
     }
 
+    /** 加载根目录 / classpath 的 {@code font.ttf}，并写入 UIManager 默认字体。 */
+    static void installAppFont() {
+        appFont = loadAppFont();
+        if (appFont == null) {
+            return;
+        }
+        FontUIResource ui = new FontUIResource(appFont.deriveFont(Font.PLAIN, UI_FONT_SIZE));
+        Enumeration<Object> keys = UIManager.getDefaults().keys();
+        while (keys.hasMoreElements()) {
+            Object key = keys.nextElement();
+            Object value = UIManager.get(key);
+            if (value instanceof FontUIResource original) {
+                UIManager.put(key, new FontUIResource(appFont.deriveFont(
+                        original.getStyle(), original.getSize2D() > 0 ? original.getSize2D() : UI_FONT_SIZE)));
+            } else if (value instanceof Font original) {
+                UIManager.put(key, appFont.deriveFont(
+                        original.getStyle(), original.getSize2D() > 0 ? original.getSize2D() : UI_FONT_SIZE));
+            }
+        }
+        UIManager.put("defaultFont", ui);
+    }
+
+    static Font loadAppFont() {
+        try (InputStream in = TrialSpawnerFinderFrame.class.getResourceAsStream("/font.ttf")) {
+            if (in != null) {
+                Font font = Font.createFont(Font.TRUETYPE_FONT, in);
+                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+                return font;
+            }
+        } catch (Exception ignored) {
+            // fall through to file path
+        }
+        for (Path candidate : List.of(
+                Path.of("font.ttf").toAbsolutePath().normalize(),
+                TrialSearchRunner.resolveWorkDirectory().resolve("font.ttf"))) {
+            if (!Files.isRegularFile(candidate)) {
+                continue;
+            }
+            try (InputStream in = Files.newInputStream(candidate)) {
+                Font font = Font.createFont(Font.TRUETYPE_FONT, in);
+                GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(font);
+                return font;
+            } catch (Exception ignored) {
+                // try next candidate
+            }
+        }
+        return null;
+    }
+
+    private static Font uiFont(float size) {
+        if (appFont != null) {
+            return appFont.deriveFont(Font.PLAIN, size);
+        }
+        return new Font(Font.SANS_SERIF, Font.PLAIN, Math.round(size));
+    }
+
+    private static void applyAppFont(Component root) {
+        if (appFont == null) {
+            return;
+        }
+        float size = root instanceof JTextArea ? RESULT_FONT_SIZE : UI_FONT_SIZE;
+        if (!(root instanceof JTextArea)
+                && root.getFont() != null
+                && root.getFont().getSize2D() > 0) {
+            size = root.getFont().getSize2D();
+        }
+        root.setFont(appFont.deriveFont(Font.PLAIN, size));
+        if (root instanceof Container container) {
+            for (Component child : container.getComponents()) {
+                applyAppFont(child);
+            }
+        }
+    }
+
     private JPanel createSingleSeedPanel() {
         JPanel left = buildFormPanel(false);
         resultArea = new JTextArea();
         resultArea.setEditable(false);
-        resultArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        resultArea.setFont(uiFont(RESULT_FONT_SIZE));
         resultArea.setBorder(BorderFactory.createTitledBorder("搜索结果"));
-        exportButton = new JButton("导出结果…");
+        exportButton = new JButton("导出结果");
         exportButton.setEnabled(false);
         exportButton.addActionListener(e -> exportSingleResults());
         JPanel right = new JPanel(new BorderLayout(0, 4));
         right.add(new JScrollPane(resultArea), BorderLayout.CENTER);
-        JPanel exportBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        JPanel exportBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         exportBar.add(exportButton);
         right.add(exportBar, BorderLayout.SOUTH);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
@@ -217,14 +302,14 @@ public final class TrialSpawnerFinderFrame extends JFrame {
         JPanel left = buildFormPanel(true);
         listResultArea = new JTextArea();
         listResultArea.setEditable(false);
-        listResultArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        listResultArea.setFont(uiFont(RESULT_FONT_SIZE));
         listResultArea.setBorder(BorderFactory.createTitledBorder("搜索结果"));
-        listExportButton = new JButton("导出结果…");
+        listExportButton = new JButton("导出结果");
         listExportButton.setEnabled(false);
         listExportButton.addActionListener(e -> exportListResults());
         JPanel right = new JPanel(new BorderLayout(0, 4));
         right.add(new JScrollPane(listResultArea), BorderLayout.CENTER);
-        JPanel exportBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        JPanel exportBar = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
         exportBar.add(listExportButton);
         right.add(exportBar, BorderLayout.SOUTH);
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
@@ -263,7 +348,7 @@ public final class TrialSpawnerFinderFrame extends JFrame {
             row++;
         } else {
             seedField = new JTextField();
-            row = addLabeled(panel, c, row, "世界种子:", seedField);
+            row = addLabeled(panel, c, row, "种子:", seedField);
         }
 
         // 线程数
@@ -389,8 +474,8 @@ public final class TrialSpawnerFinderFrame extends JFrame {
         c.weighty = 0;
         c.fill = GridBagConstraints.HORIZONTAL;
 
-        // 重置范围 + 开始/暂停/停止
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        // 重置范围 + 开始/暂停/停止（整行居中）
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.CENTER, 4, 0));
         if (listMode) {
             buttons.add(listResetBoundsButton);
             listStartButton = new JButton("开始");
@@ -787,7 +872,7 @@ public final class TrialSpawnerFinderFrame extends JFrame {
     private TrialParams parseSingleParams() throws IllegalArgumentException {
         String seedText = seedField.getText().trim();
         if (seedText.isEmpty()) {
-            throw new IllegalArgumentException("请填写世界种子，或改用「从种子列表搜索」");
+            throw new IllegalArgumentException("请填写种子，或改用「从种子列表搜索」");
         }
         long seed = Long.parseLong(seedText);
         return parseParams(seed, false);
@@ -1310,6 +1395,7 @@ public final class TrialSpawnerFinderFrame extends JFrame {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception ignored) {
             }
+            installAppFont();
             new TrialSpawnerFinderFrame().setVisible(true);
         });
     }
